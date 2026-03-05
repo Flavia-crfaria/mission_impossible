@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missile Escape</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui-layer">
+            <div id="start-screen" class="screen">
+                <h1>Missile Escape</h1>
+                <p>Press SPACE or Click to fly</p>
+                <button id="start-btn">START</button>
+            </div>
+            
+            <div id="hud-screen" class="screen hidden">
+                <div class="score-display">Score: <span id="score">0</span></div>
+            </div>
+            
+            <div id="game-over-screen" class="screen hidden">
+                <h2>MISSION FAILED</h2>
+                <p>Score: <span id="final-score">0</span></p>
+                <p>High Score: <span id="high-score">0</span></p>
+                <button id="restart-btn">RESTART</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

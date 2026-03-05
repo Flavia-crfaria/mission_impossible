@@ -1,0 +1,123 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #1a1a2e; /* Dark tech background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Orbitron', sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+    border: 2px solid #00ffcc;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0f3460;
+}
+
+canvas {
+    display: block;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let clicks pass through to canvas when needed */
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(26, 26, 46, 0.85); /* Semi-transparent overlay */
+    pointer-events: auto; /* Re-enable pointer events for UI */
+    transition: opacity 0.3s;
+}
+
+.hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none !important;
+}
+
+h1 {
+    font-size: 3.5rem;
+    color: #e94560;
+    text-shadow: 0 0 10px #e94560;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+h2 {
+    font-size: 3rem;
+    color: #ff3333;
+    text-shadow: 0 0 15px #ff0000;
+    margin-bottom: 20px;
+}
+
+p {
+    font-size: 1.2rem;
+    color: #00ffcc;
+    margin-bottom: 30px;
+}
+
+button {
+    background: #e94560;
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 15px 40px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(233, 69, 96, 0.5);
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+button:hover {
+    background: #ff5070;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(233, 69, 96, 0.8);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+#hud-screen {
+    background: transparent;
+    pointer-events: none;
+    justify-content: flex-start;
+    align-items: center;
+    padding-top: 20px;
+}
+
+.score-display {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc;
+}
