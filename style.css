@@ -5,7 +5,8 @@
 }
 
 body {
-    background-color: #1a1a2e; /* Dark tech background */
+    background-color: #1a1a2e;
+    /* Dark tech background */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -13,12 +14,16 @@ body {
     font-family: 'Orbitron', sans-serif;
     color: #fff;
     overflow: hidden;
+    touch-action: none;
+    /* Prevents scroll and zoom on touch devices */
 }
 
 #game-container {
     position: relative;
-    width: 800px;
-    height: 600px;
+    width: 100%;
+    max-width: 800px;
+    max-height: 100vh;
+    aspect-ratio: 4 / 3;
     box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
     border: 2px solid #00ffcc;
     border-radius: 8px;
@@ -27,7 +32,36 @@ body {
 }
 
 canvas {
+    width: 100%;
+    height: 100%;
     display: block;
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 2rem;
+        margin-bottom: 15px;
+    }
+
+    h2 {
+        font-size: 1.8rem;
+    }
+
+    p {
+        font-size: 1rem;
+        margin-bottom: 15px;
+        text-align: center;
+        padding: 0 10px;
+    }
+
+    .score-display {
+        font-size: 1.2rem;
+    }
+
+    button {
+        padding: 10px 20px;
+        font-size: 1.2rem;
+    }
 }
 
 #ui-layer {
@@ -36,7 +70,8 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none; /* Let clicks pass through to canvas when needed */
+    pointer-events: none;
+    /* Let clicks pass through to canvas when needed */
 }
 
 .screen {
@@ -49,8 +84,10 @@ canvas {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: rgba(26, 26, 46, 0.85); /* Semi-transparent overlay */
-    pointer-events: auto; /* Re-enable pointer events for UI */
+    background: rgba(26, 26, 46, 0.85);
+    /* Semi-transparent overlay */
+    pointer-events: auto;
+    /* Re-enable pointer events for UI */
     transition: opacity 0.3s;
 }
 

@@ -530,6 +530,11 @@ function startGame() {
 function handleInput(e) {
     if (e.type === 'keydown' && e.code !== 'Space') return;
 
+    // Prevent default touch behaviors (like scrolling or double tap zooming) if tapping the canvas/screens
+    if (e.type === 'touchstart' && e.target !== startBtn && e.target !== restartBtn) {
+        e.preventDefault();
+    }
+
     if (gameState === 'START') {
         startGame();
     } else if (gameState === 'PLAYING') {
@@ -541,6 +546,7 @@ function handleInput(e) {
 
 window.addEventListener('keydown', handleInput);
 window.addEventListener('mousedown', handleInput);
+window.addEventListener('touchstart', handleInput, { passive: false });
 
 startBtn.addEventListener('click', (e) => {
     e.stopPropagation();
