@@ -249,23 +249,24 @@ const boss = {
     update: function () {
         if (!this.active) return;
 
-        // Move left slowly until a certain point, then stay
-        if (this.x > canvas.width - this.width - 50) {
-            this.x -= 2;
-        }
+        // Make the boss move left towards the player
+        let currentDx = obstacles.dx + currentLevel * 0.5;
+        this.x -= currentDx * 0.8; // Moves slightly slower than obstacles
 
-        // Hover effect
-        this.y += Math.sin(frames * 0.05) * 2;
+        // More noticeable hover effect
+        this.y += Math.sin(frames * 0.1) * 4;
 
-        // Collision with missile
+        // Get bounding boxes
         let mLeft = missile.x - missile.width / 2;
         let mRight = missile.x + missile.width / 2;
         let mTop = missile.y - missile.height / 2;
         let mBottom = missile.y + missile.height / 2;
 
+        // Collision logic!
         if (mRight > this.x + 10 && mLeft < this.x + this.width - 10 &&
             mBottom > this.y + 10 && mTop < this.y + this.height - 10) {
-            // Hit the boss - Level up!
+
+            // Hit the boss! Explode and Level Up
             playSound('explosion');
 
             for (let i = 0; i < 60; i++) {
@@ -276,8 +277,14 @@ const boss = {
             bossSpawned = false;
             obstaclesPassedInLevel = 0;
             currentLevel++;
-            obstaclesRequiredForBoss = 5 + (currentLevel - 1) * 5; // Level 2: 10, Level 3: 15...
+            // Aumenta mais 5 obstáculos por fase
+            obstaclesRequiredForBoss = currentLevel * 5;
+
             if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
+
+        } else if (this.x + this.width < 0) {
+            // Player missed the target!
+            gameOver();
         }
     }
 };
