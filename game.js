@@ -6,14 +6,21 @@ const startScreen = document.getElementById('start-screen');
 const hudScreen = document.getElementById('hud-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const scoreEl = document.getElementById('score');
+const levelDisplayEl = document.getElementById('level-display');
 const finalScoreEl = document.getElementById('final-score');
 const highScoreEl = document.getElementById('high-score');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const endTitleEl = document.getElementById('end-title');
+const endSubtitleEl = document.getElementById('end-subtitle');
 
 // Game State
-let gameState = 'START'; // START, PLAYING, GAMEOVER
+let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
 let score = 0;
+let currentLevel = 1;
+const scorePerLevel = 5;
+const maxLevel = 3;
+let bossSpawned = false;
 let highScore = localStorage.getItem('missileHighScore') || 0;
 let frames = 0;
 let animationId;
@@ -29,18 +36,18 @@ function initAudio() {
 
 function playSound(type) {
     if (!audioCtx) return;
-    
+
     // Resume context if suspended
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
-    
+
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-    
+
     osc.connect(gainNode);
     gainNode.connect(audioCtx.destination);
-    
+
     if (type === 'jump') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(150, audioCtx.currentTime);
@@ -64,20 +71,20 @@ function playSound(type) {
         for (let i = 0; i < bufferSize; i++) {
             data[i] = Math.random() * 2 - 1;
         }
-        
+
         const noise = audioCtx.createBufferSource();
         noise.buffer = buffer;
-        
+
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 1000;
-        
+
         noise.connect(filter);
         filter.connect(gainNode);
-        
+
         gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        
+
         noise.start();
     }
 }
@@ -91,59 +98,59 @@ const missile = {
     dy: 0,
     gravity: 0.25,
     jump: -5.5,
-    
-    draw: function() {
+
+    draw: function () {
         if (gameState === 'GAMEOVER') return; // Don't draw if destroyed
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        
+
         // Rotate missile based on velocity
         let targetRotation = this.dy * 0.1;
         targetRotation = Math.max(-0.5, Math.min(targetRotation, 0.5)); // clamp
         ctx.rotate(targetRotation);
-        
+
         // Draw Missile Body
-        ctx.fillStyle = '#e94560'; 
+        ctx.fillStyle = '#e94560';
         ctx.beginPath();
-        ctx.moveTo(0, -this.height/2);
-        ctx.lineTo(this.width - 10, -this.height/2);
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width - 10, -this.height / 2);
         ctx.lineTo(this.width, 0); // Nose cone
-        ctx.lineTo(this.width - 10, this.height/2);
-        ctx.lineTo(0, this.height/2);
+        ctx.lineTo(this.width - 10, this.height / 2);
+        ctx.lineTo(0, this.height / 2);
         ctx.closePath();
         ctx.fill();
-        
+
         // Fins
         ctx.fillStyle = '#111';
         ctx.fillRect(-5, -this.height, 10, this.height * 2);
-        
+
         // Cockpit window
         ctx.fillStyle = '#00ffcc';
         ctx.beginPath();
         ctx.arc(this.width - 15, -2, 4, 0, Math.PI * 2);
         ctx.fill();
-        
+
         ctx.restore();
     },
-    
-    update: function() {
+
+    update: function () {
         this.dy += this.gravity;
         this.y += this.dy;
-        
+
         // Floor and ceiling collision
-        if (this.y + this.height/2 >= canvas.height || this.y - this.height/2 <= 0) {
+        if (this.y + this.height / 2 >= canvas.height || this.y - this.height / 2 <= 0) {
             gameOver();
         }
     },
-    
-    flap: function() {
+
+    flap: function () {
         if (gameState !== 'PLAYING') return;
         this.dy = this.jump;
         playSound('jump');
         // Add particles
-        for(let i=0; i<5; i++) {
-            particles.push(new Particle(this.x - this.width/2, this.y, true));
+        for (let i = 0; i < 5; i++) {
+            particles.push(new Particle(this.x - this.width / 2, this.y, true));
         }
     }
 };
@@ -154,7 +161,7 @@ class Particle {
         this.x = x;
         this.y = y;
         this.isThrust = isThrust;
-        
+
         if (isThrust) {
             this.vx = (Math.random() - 1) * 3 - 2; // Move left
             this.vy = (Math.random() - 0.5) * 2;
@@ -172,17 +179,17 @@ class Particle {
             this.size = Math.random() * 6 + 3;
         }
     }
-    
+
     update() {
         this.x += this.vx;
         this.y += this.vy;
         this.life -= this.decay;
-        
+
         if (this.isThrust) {
             this.size *= 0.95;
         }
     }
-    
+
     draw() {
         ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color;
@@ -195,64 +202,158 @@ class Particle {
 
 let particles = [];
 
+// Boss / Target
+const boss = {
+    x: 0,
+    y: 0,
+    width: 90,
+    height: 90,
+    active: false,
+
+    spawn: function () {
+        this.active = true;
+        this.x = canvas.width;
+        this.y = canvas.height / 2 - this.height / 2;
+    },
+
+    draw: function () {
+        if (!this.active) return;
+
+        let w = this.width;
+        let h = this.height;
+        let x = this.x;
+        let y = this.y;
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Skin (Orange)
+        ctx.fillStyle = '#ffb366';
+        ctx.beginPath();
+        ctx.rect(10, 20, w - 20, h - 20);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = 'white';
+        ctx.fillRect(20, 35, 12, 8);
+        ctx.fillRect(w - 32, 35, 12, 8);
+        ctx.fillStyle = '#0077ff'; // blue eyes
+        ctx.fillRect(24, 35, 6, 6);
+        ctx.fillRect(w - 28, 35, 6, 6);
+
+        // Hair (Yellow)
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(0, 25);
+        ctx.quadraticCurveTo(w / 2, -15, w, 25);
+        ctx.lineTo(w, 5);
+        ctx.quadraticCurveTo(w / 2, -25, 0, 5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Mouth
+        ctx.fillStyle = '#cc5200';
+        ctx.beginPath();
+        ctx.ellipse(w / 2, h - 15, 12, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    },
+
+    update: function () {
+        if (!this.active) return;
+
+        // Move left slowly until a certain point, then stay
+        if (this.x > canvas.width - this.width - 50) {
+            this.x -= 2;
+        }
+
+        // Hover effect
+        this.y += Math.sin(frames * 0.05) * 2;
+
+        // Collision with missile
+        let mLeft = missile.x - missile.width / 2;
+        let mRight = missile.x + missile.width / 2;
+        let mTop = missile.y - missile.height / 2;
+        let mBottom = missile.y + missile.height / 2;
+
+        if (mRight > this.x + 10 && mLeft < this.x + this.width - 10 &&
+            mBottom > this.y + 10 && mTop < this.y + this.height - 10) {
+            victory();
+        }
+    }
+};
+
 // Obstacles
 const obstacles = {
     items: [],
     width: 60,
     gap: 150,
-    dx: 3, 
-    
-    draw: function() {
+    dx: 3,
+
+    draw: function () {
         for (let i = 0; i < this.items.length; i++) {
             let p = this.items[i];
-            
-            ctx.fillStyle = '#0f3460'; 
-            ctx.strokeStyle = '#00ffcc'; 
+
+            ctx.fillStyle = '#0f3460';
+            ctx.strokeStyle = '#00ffcc';
             ctx.lineWidth = 2;
-            
+
             // Top obstacle
             ctx.fillRect(p.x, 0, this.width, p.y);
             ctx.strokeRect(p.x, 0, this.width, p.y);
-            
+
             // Bottom obstacle
             ctx.fillRect(p.x, p.y + this.gap, this.width, canvas.height - p.y - this.gap);
             ctx.strokeRect(p.x, p.y + this.gap, this.width, canvas.height - p.y - this.gap);
         }
     },
-    
-    update: function() {
-        // Increase speed slightly based on score
-        let currentDx = this.dx + Math.floor(score / 5) * 0.5;
-        
-        // Spawn obstacles
-        if (frames % 100 === 0) {
-             let maxYPos = canvas.height - this.gap - 50;
-             let yPos = Math.max(50, Math.random() * maxYPos);
-             
-             this.items.push({
-                 x: canvas.width,
-                 y: yPos,
-                 passed: false
-             });
+
+    update: function () {
+        // Calculate Level
+        currentLevel = 1 + Math.floor(score / scorePerLevel);
+        if (currentLevel > maxLevel) currentLevel = maxLevel;
+        if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
+
+        // Boss spawn logic
+        if (currentLevel === maxLevel && !bossSpawned) {
+            if (this.items.length === 0 || this.items[this.items.length - 1].x < canvas.width - 400) {
+                boss.spawn();
+                bossSpawned = true;
+            }
         }
-        
+
+        let currentDx = this.dx + currentLevel * 0.5;
+
+        // Spawn obstacles
+        if (frames % 100 === 0 && currentLevel < maxLevel) {
+            let maxYPos = canvas.height - this.gap - 50;
+            let yPos = Math.max(50, Math.random() * maxYPos);
+
+            this.items.push({
+                x: canvas.width,
+                y: yPos,
+                passed: false
+            });
+        }
+
         for (let i = 0; i < this.items.length; i++) {
             let p = this.items[i];
-            
+
             p.x -= currentDx;
-            
+
             // Collision detection
-            let mLeft = missile.x - missile.width/2 + 5;
-            let mRight = missile.x + missile.width/2 - 5;
-            let mTop = missile.y - missile.height/2 + 2;
-            let mBottom = missile.y + missile.height/2 - 2;
-            
+            let mLeft = missile.x - missile.width / 2 + 5;
+            let mRight = missile.x + missile.width / 2 - 5;
+            let mTop = missile.y - missile.height / 2 + 2;
+            let mBottom = missile.y + missile.height / 2 - 2;
+
             if (mRight > p.x && mLeft < p.x + this.width) {
-                 if (mTop < p.y || mBottom > p.y + this.gap) {
-                     gameOver();
-                 }
+                if (mTop < p.y || mBottom > p.y + this.gap) {
+                    gameOver();
+                }
             }
-            
+
             // Score handling
             if (p.x + this.width < mLeft && !p.passed) {
                 score++;
@@ -260,7 +361,7 @@ const obstacles = {
                 scoreEl.innerText = score;
                 playSound('score');
             }
-            
+
             // Clean up
             if (p.x + this.width < 0) {
                 this.items.shift();
@@ -268,8 +369,8 @@ const obstacles = {
             }
         }
     },
-    
-    reset: function() {
+
+    reset: function () {
         this.items = [];
     }
 }
@@ -277,19 +378,19 @@ const obstacles = {
 // Background starfield / speed lines
 const bgLines = {
     lines: [],
-    
-    draw: function() {
+
+    draw: function () {
         ctx.fillStyle = '#ffffff';
-        for(let i=0; i<this.lines.length; i++) {
+        for (let i = 0; i < this.lines.length; i++) {
             let l = this.lines[i];
             ctx.globalAlpha = l.alpha;
             ctx.fillRect(l.x, l.y, l.length, 1);
         }
         ctx.globalAlpha = 1;
     },
-    
-    update: function() {
-        if(Math.random() < 0.3) {
+
+    update: function () {
+        if (Math.random() < 0.3) {
             this.lines.push({
                 x: canvas.width,
                 y: Math.random() * canvas.height,
@@ -298,13 +399,13 @@ const bgLines = {
                 alpha: Math.random() * 0.5 + 0.1
             });
         }
-        
-        for(let i=0; i<this.lines.length; i++) {
+
+        for (let i = 0; i < this.lines.length; i++) {
             let l = this.lines[i];
             let currentDx = (obstacles.dx + Math.floor(score / 5) * 0.5) * 0.5;
             l.x -= l.speed + currentDx;
-            
-            if(l.x + l.length < 0) {
+
+            if (l.x + l.length < 0) {
                 this.lines.splice(i, 1);
                 i--;
             }
@@ -313,14 +414,15 @@ const bgLines = {
 }
 
 function draw() {
-    ctx.fillStyle = '#0f3460'; 
+    ctx.fillStyle = '#0f3460';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     bgLines.draw();
     obstacles.draw();
+    boss.draw();
     missile.draw();
-    
-    for(let i=0; i<particles.length; i++) {
+
+    for (let i = 0; i < particles.length; i++) {
         particles[i].draw();
     }
 }
@@ -330,19 +432,20 @@ function update() {
         bgLines.update();
         missile.update();
         obstacles.update();
-        
+        boss.update();
+
         // Thrust trail
         if (frames % 3 === 0) {
-            particles.push(new Particle(missile.x - missile.width/2, missile.y, true));
+            particles.push(new Particle(missile.x - missile.width / 2, missile.y, true));
         }
     } else if (gameState === 'START') {
-         bgLines.update();
-         missile.y = 300 + Math.sin(frames * 0.05) * 10; // hovering effect
+        bgLines.update();
+        missile.y = 300 + Math.sin(frames * 0.05) * 10; // hovering effect
     }
-    
-    for(let i=0; i<particles.length; i++) {
+
+    for (let i = 0; i < particles.length; i++) {
         particles[i].update();
-        if(particles[i].life <= 0) {
+        if (particles[i].life <= 0) {
             particles.splice(i, 1);
             i--;
         }
@@ -356,11 +459,26 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-function setGameOverUI() {
+function setGameOverUI(isVictory = false) {
     hudScreen.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
+
+    if (isVictory) {
+        endTitleEl.innerText = "MISSION ACCOMPLISHED!";
+        endTitleEl.style.color = "#00ffcc";
+        endTitleEl.style.textShadow = "0 0 15px #00ffcc";
+        endSubtitleEl.innerText = "Target Destroyed";
+        endSubtitleEl.style.color = "#00ffcc";
+    } else {
+        endTitleEl.innerText = "MISSION FAILED";
+        endTitleEl.style.color = "#ff3333";
+        endTitleEl.style.textShadow = "0 0 15px #ff0000";
+        endSubtitleEl.innerText = "You hit an obstacle";
+        endSubtitleEl.style.color = "#ff3333";
+    }
+
     finalScoreEl.innerText = score;
-    
+
     if (score > highScore) {
         highScore = score;
         localStorage.setItem('missileHighScore', highScore);
@@ -368,22 +486,40 @@ function setGameOverUI() {
     highScoreEl.innerText = highScore;
 }
 
+function victory() {
+    if (gameState === 'VICTORY' || gameState === 'GAMEOVER') return;
+    gameState = 'VICTORY';
+    playSound('explosion');
+
+    for (let i = 0; i < 60; i++) {
+        particles.push(new Particle(boss.x + boss.width / 2, boss.y + boss.height / 2, false));
+    }
+
+    boss.active = false;
+
+    setTimeout(() => { setGameOverUI(true); }, 1500);
+}
+
 function gameOver() {
-    if (gameState === 'GAMEOVER') return;
+    if (gameState === 'GAMEOVER' || gameState === 'VICTORY') return;
     gameState = 'GAMEOVER';
     playSound('explosion');
-    
-    for(let i=0; i<40; i++) {
+
+    for (let i = 0; i < 40; i++) {
         particles.push(new Particle(missile.x, missile.y, false));
     }
-    
-    setTimeout(setGameOverUI, 1000); 
+
+    setTimeout(() => { setGameOverUI(false); }, 1000);
 }
 
 function resetGame() {
     missile.y = 300;
     missile.dy = 0;
     obstacles.reset();
+    boss.active = false;
+    bossSpawned = false;
+    currentLevel = 1;
+    if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
     particles = [];
     score = 0;
     scoreEl.innerText = score;
@@ -402,12 +538,12 @@ function startGame() {
 
 function handleInput(e) {
     if (e.type === 'keydown' && e.code !== 'Space') return;
-    
+
     if (gameState === 'START') {
         startGame();
     } else if (gameState === 'PLAYING') {
         missile.flap();
-    } else if (gameState === 'GAMEOVER' && !gameOverScreen.classList.contains('hidden')) {
+    } else if ((gameState === 'GAMEOVER' || gameState === 'VICTORY') && !gameOverScreen.classList.contains('hidden')) {
         startGame();
     }
 }
