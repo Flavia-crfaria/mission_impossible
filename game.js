@@ -1,6 +1,10 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+const bossImg = new Image();
+bossImg.src = 'trump.png'; // Make sure the user saves this file correctly
+
+
 // UI Elements
 const startScreen = document.getElementById('start-screen');
 const hudScreen = document.getElementById('hud-screen');
@@ -15,11 +19,11 @@ const endTitleEl = document.getElementById('end-title');
 const endSubtitleEl = document.getElementById('end-subtitle');
 
 // Game State
-let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
+let gameState = 'START'; // START, PLAYING, GAMEOVER
 let score = 0;
 let currentLevel = 1;
-const scorePerLevel = 5;
-const maxLevel = 3;
+let obstaclesPassedInLevel = 0;
+let obstaclesRequiredForBoss = 5;
 let bossSpawned = false;
 let highScore = localStorage.getItem('missileHighScore') || 0;
 let frames = 0;
@@ -227,35 +231,17 @@ const boss = {
         ctx.save();
         ctx.translate(x, y);
 
-        // Skin (Orange)
-        ctx.fillStyle = '#ffb366';
-        ctx.beginPath();
-        ctx.rect(10, 20, w - 20, h - 20);
-        ctx.fill();
-
-        // Eyes
-        ctx.fillStyle = 'white';
-        ctx.fillRect(20, 35, 12, 8);
-        ctx.fillRect(w - 32, 35, 12, 8);
-        ctx.fillStyle = '#0077ff'; // blue eyes
-        ctx.fillRect(24, 35, 6, 6);
-        ctx.fillRect(w - 28, 35, 6, 6);
-
-        // Hair (Yellow)
-        ctx.fillStyle = '#ffcc00';
-        ctx.beginPath();
-        ctx.moveTo(0, 25);
-        ctx.quadraticCurveTo(w / 2, -15, w, 25);
-        ctx.lineTo(w, 5);
-        ctx.quadraticCurveTo(w / 2, -25, 0, 5);
-        ctx.closePath();
-        ctx.fill();
-
-        // Mouth
-        ctx.fillStyle = '#cc5200';
-        ctx.beginPath();
-        ctx.ellipse(w / 2, h - 15, 12, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
+        if (bossImg.complete && bossImg.naturalWidth !== 0) {
+            ctx.drawImage(bossImg, 0, 0, w, h);
+        } else {
+            // Fallback square if image not found
+            ctx.fillStyle = '#ffb366';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = 'red';
+            ctx.font = "bold 15px Orbitron";
+            ctx.textAlign = "center";
+            ctx.fillText("TARGET", w / 2, h / 2);
+        }
 
         ctx.restore();
     },
@@ -279,7 +265,19 @@ const boss = {
 
         if (mRight > this.x + 10 && mLeft < this.x + this.width - 10 &&
             mBottom > this.y + 10 && mTop < this.y + this.height - 10) {
-            victory();
+            // Hit the boss - Level up!
+            playSound('explosion');
+
+            for (let i = 0; i < 60; i++) {
+                particles.push(new Particle(this.x + this.width / 2, this.y + this.height / 2, false));
+            }
+
+            this.active = false;
+            bossSpawned = false;
+            obstaclesPassedInLevel = 0;
+            currentLevel++;
+            obstaclesRequiredForBoss = 5 + (currentLevel - 1) * 5; // Level 2: 10, Level 3: 15...
+            if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
         }
     }
 };
@@ -310,13 +308,8 @@ const obstacles = {
     },
 
     update: function () {
-        // Calculate Level
-        currentLevel = 1 + Math.floor(score / scorePerLevel);
-        if (currentLevel > maxLevel) currentLevel = maxLevel;
-        if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
-
         // Boss spawn logic
-        if (currentLevel === maxLevel && !bossSpawned) {
+        if (!bossSpawned && obstaclesPassedInLevel >= obstaclesRequiredForBoss) {
             if (this.items.length === 0 || this.items[this.items.length - 1].x < canvas.width - 400) {
                 boss.spawn();
                 bossSpawned = true;
@@ -326,7 +319,7 @@ const obstacles = {
         let currentDx = this.dx + currentLevel * 0.5;
 
         // Spawn obstacles
-        if (frames % 100 === 0 && currentLevel < maxLevel) {
+        if (frames % 100 === 0 && !bossSpawned) {
             let maxYPos = canvas.height - this.gap - 50;
             let yPos = Math.max(50, Math.random() * maxYPos);
 
@@ -357,6 +350,7 @@ const obstacles = {
             // Score handling
             if (p.x + this.width < mLeft && !p.passed) {
                 score++;
+                obstaclesPassedInLevel++;
                 p.passed = true;
                 scoreEl.innerText = score;
                 playSound('score');
@@ -486,22 +480,10 @@ function setGameOverUI(isVictory = false) {
     highScoreEl.innerText = highScore;
 }
 
-function victory() {
-    if (gameState === 'VICTORY' || gameState === 'GAMEOVER') return;
-    gameState = 'VICTORY';
-    playSound('explosion');
-
-    for (let i = 0; i < 60; i++) {
-        particles.push(new Particle(boss.x + boss.width / 2, boss.y + boss.height / 2, false));
-    }
-
-    boss.active = false;
-
-    setTimeout(() => { setGameOverUI(true); }, 1500);
-}
+// Removed victory function as game is now endless
 
 function gameOver() {
-    if (gameState === 'GAMEOVER' || gameState === 'VICTORY') return;
+    if (gameState === 'GAMEOVER') return;
     gameState = 'GAMEOVER';
     playSound('explosion');
 
@@ -519,6 +501,8 @@ function resetGame() {
     boss.active = false;
     bossSpawned = false;
     currentLevel = 1;
+    obstaclesPassedInLevel = 0;
+    obstaclesRequiredForBoss = 5;
     if (levelDisplayEl) levelDisplayEl.innerText = currentLevel;
     particles = [];
     score = 0;
@@ -543,7 +527,7 @@ function handleInput(e) {
         startGame();
     } else if (gameState === 'PLAYING') {
         missile.flap();
-    } else if ((gameState === 'GAMEOVER' || gameState === 'VICTORY') && !gameOverScreen.classList.contains('hidden')) {
+    } else if (gameState === 'GAMEOVER' && !gameOverScreen.classList.contains('hidden')) {
         startGame();
     }
 }
